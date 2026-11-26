@@ -1,0 +1,9 @@
+# Data and model files are large: share them on Drive, not in git
+data/*
+!data/.gitkeep
+outputs/*.joblib
+outputs/*.npy
+outputs/*.parquet
+__pycache__/
+.ipynb_checkpoints/
+.DS_Store
