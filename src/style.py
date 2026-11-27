@@ -28,6 +28,7 @@ FEATURES = ["danceability", "energy", "loudness", "speechiness", "acousticness",
             "instrumentalness", "liveness", "valence", "tempo", "duration_ms",
             "key", "mode", "time_signature"]
 PCA_FEATURES = [f for f in FEATURES if f not in ("key", "mode", "time_signature")]  # 10 continuous
+KEY_NAMES = ["C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"]       # Spotify pitch class 0-11
 
 # ---- Target: 4 eras ------------------------------------------------------------
 ERA_BINS = [-np.inf, 1959, 1979, 1999, np.inf]      # <=1959 | 1960-79 | 1980-99 | >=2000
@@ -68,6 +69,13 @@ def make_model_table(clean_df):
         df["artist_id"] = df["id_artists"].map(_first_id)
     missing = df["artist_id"].isna().sum()
     assert missing == 0, f"{missing} rows have no artist id"
+    # The cleaned CSV stores key as note names and mode as Minor/Major (for charts).
+    # Map back to Spotify's numeric codes so every model gets numbers.
+    if df["key"].dtype == object:
+        df["key"] = df["key"].map({k: i for i, k in enumerate(KEY_NAMES)})
+    if df["mode"].dtype == object:
+        df["mode"] = df["mode"].map({"Minor": 0, "Major": 1})
+    df[FEATURES] = df[FEATURES].astype(float)                         # fails loudly if any text is left
     return df[["id", "name", "artist_id", "year", "era"] + FEATURES]
 
 
