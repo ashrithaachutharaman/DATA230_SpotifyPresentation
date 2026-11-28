@@ -15,8 +15,8 @@ dashboards/   dash_app.py (Jason), streamlit_app.py (Ashritha)
 2. Run the cleaning section of `analysis.ipynb` (needs Kaggle `tracks.csv` + `artists.csv`); it writes `data/tracks_clean.csv`.
    Or download the shared `tracks_clean.csv` into `data/`.
 3. From the repo root: `python -m src.check_setup`
-4. Post your counts in the group chat. They must match exactly; if not, you have a different cleaned file.
+4. Post your counts and `test hash` in the group chat. They must match exactly; if not, you have a different cleaned file or different package versions.
 
-In a notebook: `from src.style import *` (the stubs in `notebooks/` already add the repo root to the path).
+In a notebook: `from src.style import *` (the stubs in `notebooks/` find the repo root and add it to the path, wherever Jupyter was started).
 
 Change anything in `src/style.py` only with the whole group.

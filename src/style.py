@@ -5,6 +5,7 @@
 # so names, colours, era order, seed and the train/test split are identical everywhere.
 
 import ast
+import hashlib
 from pathlib import Path
 
 import numpy as np
@@ -58,8 +59,18 @@ def load_clean(path=CLEAN_PATH):
     return pd.read_csv(path, low_memory=False)
 
 
+def music_only(clean_df):
+    """Same rows as the EDA's analysis copy (analysis.ipynb 2.8 and 3A):
+    drop spoken word, then keep the 1st-99th percentile duration window of what is left."""
+    df = clean_df.loc[~clean_df["is_spoken_word"].astype(bool)]
+    dur = df["duration_min"] if "duration_min" in df else df["duration_ms"] / 60_000
+    lo, hi = dur.quantile([0.01, 0.99])
+    return df.loc[dur.between(lo, hi)]
+
+
 def make_model_table(clean_df):
-    df = clean_df.sort_values("id").reset_index(drop=True)            # fixed row order
+    df = music_only(clean_df)
+    df = df.sort_values("id").reset_index(drop=True)                  # fixed row order
     year = df["year"] if "year" in df else df["release_year"]         # CSV calls it release_year
     df["year"] = year.astype(int)
     df["era"] = pd.cut(df["year"], ERA_BINS, labels=False).astype(int)
@@ -71,10 +82,12 @@ def make_model_table(clean_df):
     assert missing == 0, f"{missing} rows have no artist id"
     # The cleaned CSV stores key as note names and mode as Minor/Major (for charts).
     # Map back to Spotify's numeric codes so every model gets numbers.
-    if df["key"].dtype == object:
+    # is_numeric_dtype, not `dtype == object`: pandas 3 reads text as the new str dtype.
+    if not pd.api.types.is_numeric_dtype(df["key"]):
         df["key"] = df["key"].map({k: i for i, k in enumerate(KEY_NAMES)})
-    if df["mode"].dtype == object:
+    if not pd.api.types.is_numeric_dtype(df["mode"]):
         df["mode"] = df["mode"].map({"Minor": 0, "Major": 1})
+    assert df[["key", "mode"]].notna().all().all(), "unknown key/mode label"  # else NaN, imputed silently
     df[FEATURES] = df[FEATURES].astype(float)                         # fails loudly if any text is left
     return df[["id", "name", "artist_id", "year", "era"] + FEATURES]
 
@@ -95,9 +108,16 @@ def make_split(df):
     return df
 
 
+def split_hash(split_df):
+    """Short fingerprint of the test track ids. Same hash = same test set (counts alone can match by chance)."""
+    test_ids = split_df.loc[split_df.split == "test", "id"].astype(str)
+    return hashlib.md5("".join(sorted(test_ids)).encode()).hexdigest()[:8]
+
+
 def check_split(split_df):
-    """Print the counts everyone compares on day 1. Identical numbers = identical data."""
+    """Print the counts and test-set hash everyone compares on day 1. Identical output = identical split."""
     print("rows:", len(split_df))
+    print("test hash:", split_hash(split_df))
     print(split_df.split.value_counts().to_string(), "\n")
     print(split_df.fold.value_counts().sort_index().to_string(), "\n")
     print(pd.crosstab(split_df.split, split_df.era.map(dict(zip(ERA_ORDER, ERA_LABELS))),
